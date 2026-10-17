@@ -1540,14 +1540,16 @@ impl<'a> Parser<'a> {
             },
         );
 
-        Ok(Shared::new(Node {
+        let dict_node = Shared::new(Node {
             kind: NodeKind::Dict {
                 entries: children.into(),
             },
             token: None,
             leading_trivia,
             trailing_trivia: TriviaList::new(),
-        }))
+        });
+
+        self.parse_postfix_chain(dict_node)
     }
 
     fn parse_interpolated_string(&mut self, leading_trivia: TriviaList) -> Result<Shared<Node>, ParseError> {
@@ -10632,6 +10634,16 @@ Shared::new(Node {
         let (nodes, errors) = crate::parse_recovery(code);
         assert!(!errors.has_errors(), "{code}: {errors:?}");
         assert!(matches!(nodes[0].kind, NodeKind::Dict { .. }), "{code}");
+    }
+
+    #[rstest]
+    #[case::string_key("{\"a\": 1}[\"a\"]")]
+    #[case::symbol_key("{\"a\": 1}[:a]")]
+    #[case::chained("{\"a\": {\"b\": 2}}[\"a\"][\"b\"]")]
+    fn test_dict_literal_index(#[case] code: &str) {
+        let (nodes, errors) = crate::parse_recovery(code);
+        assert!(!errors.has_errors(), "{code}: {errors:?}");
+        assert!(matches!(nodes[0].kind, NodeKind::Call { .. }), "{code}");
     }
 
     const TOKEN_SOUP: &[&str] = &[
